@@ -1,0 +1,11 @@
+name = panelspagealias
+description = enhance pathauto to create path alias based on panels page tid and/or nid arguments.
+core = 6.x
+package = Other
+dependencies[] = pathauto
+dependencies[] = panels
+dependencies[] = page_manager
+version = "6.x-0.dev"
+core = "6.x"
+project = "panelspagealias"
+

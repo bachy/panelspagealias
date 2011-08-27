@@ -1,0 +1,695 @@
+<?php
+
+/**
+ * @file
+ * Hook implementations for view alias module integration.
+ *
+ * @ingroup pathauto
+ */
+
+// define('PANELSPAGEALIAS_REQUIRED_CTOOLS_API', '1.8');
+
+define('PANELSPAGEALIAS_PERM_ADMIN', 'administer panels_page_alias');
+
+
+/**
+*
+* hook_perm()
+*
+*/
+function panelspagealias_perm(){
+	return array('administer panelspagealias');
+}
+
+
+/**
+ * Implementation of hook_menu().
+ */
+// function panelspagealias_menu() {
+// 	$items = array();
+// 
+// 	$items['admin/build/path/panelspagealias/bulkupdate'] = array(
+// 	  'title' => 'panels page alias',
+// 	  'description' => 'generate all panels page alias node.',
+// 	  'page callback' => 'panelspagealias_pathauto_bulkupdate',
+// 	  // 'page arguments' => array('jqplug_admin_settings'),
+// 	  'access arguments' => array(PANELSPAGEALIAS_PERM_ADMIN),
+// 	  'type' => MENU_NORMAL_ITEM	
+// 	);
+// 	return $items;
+// }
+
+
+
+/**
+ * Implementation of hook_pathauto().
+ */
+function panelspagealias_pathauto($op) {
+  switch ($op) {
+    case 'settings':
+      $settings = array();
+      $settings['module'] = 'panelspagealias';
+      $settings['token_type'] = 'panelspagealias';
+      $settings['groupheader'] = t('Panels Page Alias settings');
+      $settings['patterndescr'] = t('Default Panels Page Alias pattern (applies to all pages with a argument)');
+      $settings['patterndefault'] = t('');
+      // $settings['bulkname'] = t('Bulk generate aliases for views with nid arguments that are not aliased');
+      // $settings['bulkdescr'] = t('Generate aliases for all existing views with nid arguments which do not already have aliases.');
+			## remplacé par ça
+     	## $settings['batch_update_callback'] = 'node_pathauto_bulk_update_batch_process';
+      ## $settings['batch_file'] = drupal_get_path('module', 'pathauto') . '/pathauto.pathauto.inc';      
+
+      // left out patterns since we dont use them.
+      # $settings['placeholders'] = array( t('[nid]'), t('The nid argument node nid'));
+      
+      $settings['patternitems'] = array();
+      return (object) $settings;
+
+    default:
+      break;
+  }
+}
+
+/**
+ * 
+ * Do the bulk updating for view aliases
+ *
+ */
+// function panelspagealias_pathauto_bulkupdate() {
+//   $aliasable = _get_node_aliasable_displays();
+//   
+//   
+//   foreach ($aliasable as $alias) {
+//     if (variable_get("pathauto_panelspagealias_{$alias->path}", FALSE)) {
+//       $nodes = _gather_nodes_for_alias($alias->nidarg);
+// 			// dsm($nodes);
+//       foreach ($nodes as $node) {
+// 				$alias = panelspagealias_create_alias($node, $alias, 'bulkupdate');
+// 				drupal_set_message(t('Alias %alias has been created', array('%alias' => $alias )), 'status');
+//       }
+//     }
+//   }
+// }
+
+// function _gather_nodes_for_alias($validator_types) {
+//   $types = explode(",", $validator_types);
+// 
+//   $nodes_to_alias = array();
+//   
+//   foreach($types as $type) {
+//     $nodes = node_load(array('type'=>$type));
+//     $nodes_to_alias = array_merge($nodes_to_alias, $nodes);
+//   }
+// 
+//   return $nodes_to_alias;
+// }
+
+/**
+ *
+ * Implementation of hook_path_alais_types from pathauto
+ * allows me to hook into the bulk delete
+ *
+ */
+// function panelspagealias_path_alias_types() {
+//   $aliasable = _get_node_aliasable_displays();
+//   foreach($aliasable as $alias) {
+//     $objects["$alias->path"] = t("View page displays having a path of '$alias->path'");
+//   }
+// 
+//   return $objects;  
+// }
+
+/**
+ *
+ * Implementation of hook_form_alter
+ * remove the default form settings and add our own since view alias are different from the regular
+ * alaises
+ *
+ */
+function panelspagealias_form_alter(&$form, $form_state, $form_id) {
+	// dsm($form_id, 'panelspagealias_form_alter : form_id');
+	
+	// if($form_id == 'page_manager_page_form_basic'){
+	// 	dsm($form, 'form');
+	// 	dsm($form_state, 'form_state');
+	// 	
+	// 	$form['base_alias'] = array(
+	// 		'#type' => 'textfield',
+	// 		'#title' => t('alias base'),
+	// 		'#description' => t('the base you want to build the alias'),
+	// 		'#size' => 40,
+	// 		'#maxlength' => 25,
+	// 		'#default_value'=> variable_get("panelsalias_{$form_state->task_name}_base", ''),
+	// 	);
+	// 	
+	// 	$form['#submit'][] = 'panelsalias_panels_submit';
+	// }
+	
+	if($form_id == 'pathauto_admin_settings') {
+    unset($form['panelspagealias']['pathauto_panelspagealias_pattern']);
+    unset($form['panelspagealias']['token_help']);
+
+    $aliasable = _get_panels_page_aliasable();
+		$pages_form = array();
+    foreach($aliasable as $task) {
+			// dsm($task, 'task');
+			$pages_form["pathauto_panelspagealias_{$task->taskname}"] = array(
+				'#type' => 'fieldset',
+				'#title' => t('@name', array('@name'=>$task->taskname)),
+				'#description' => t("Page @taskname, display @subtaskname, on path @path, with @args argument(s).", array('@taskname'=>$task->taskname, '@subtaskname'=>$task->subtaskname, '@path'=>$task->path, '@args'=>implode(',', $task->argumentstypes))),
+				'#collapsible' => FALSE,
+				'#collapsed' => FALSE,
+				// '#access' => user_access('administer module'),
+			);
+			
+				
+				
+				
+			$pages_form["pathauto_panelspagealias_{$task->taskname}"]["pathauto_panelspagealias_{$task->taskname}_active"] = array(
+			  '#type' => 'checkbox',
+			  // '#title' => t("Page $task->task_name, display {$task->subtask['name']}, on path $path, with nid argument."),
+			  '#title' => t("Activated"),
+			  '#weight' => -1,
+			  '#default_value' => variable_get("pathauto_panelspagealias_{$task->taskname}_active", 0),
+				'#tree'=>true,
+			);
+			
+			$pages_form["pathauto_panelspagealias_{$task->taskname}"]["pathauto_panelspagealias_{$task->taskname}_alias_base"] = array(
+				'#type' => 'textfield',
+				'#title' => t('Alias base'),
+				'#description' => t('the begining of the alias. set &lt;none&gt; to hide the default page base alias.'),
+				'#size' => 40,
+				'#maxlength' => 255,
+				'#default_value' => variable_get("pathauto_panelspagealias_{$task->taskname}_alias_base", ""),
+			);
+			
+			foreach ($task->arguments as $arg_name => $arg) {
+
+				$pages_form["pathauto_panelspagealias_{$task->taskname}"]["pathauto_panelspagealias_{$task->taskname}_{$arg_name}_token"] = array(
+					'#type' => 'textfield',
+					'#title' => t('Default : @arg replacement (@type)', array('@arg' => $arg_name, '@type'=>$arg['argtype'])),
+					'#description' => t('set the default replacement pattern for this arg. if nothing [cat-raw] or [title-raw]'),
+					'#size' => 40,
+					'#maxlength' => 255,
+					'#default_value' => variable_get("pathauto_panelspagealias_{$task->taskname}_{$arg_name}_token", ""),
+				);
+				
+				if($arg['argtype'] == 'nid'){
+					$node_types = node_get_types();
+					foreach ($node_types as $node_type_name => $node_type) {
+						$pages_form["pathauto_panelspagealias_{$task->taskname}"]["pathauto_panelspagealias_{$task->taskname}_{$arg_name}_{$node_type_name}_token"] = array(
+							'#type' => 'textfield',
+							'#title' => t('@nodetype : @arg replacement (@argtype)', array('@nodetype'=>$node_type_name, '@arg' => $arg_name, '@argtype'=>$arg['argtype'])),
+							'#description' => t('set the replacement pattern for this arg for node type : @nodetype.', array('@nodetype'=>$node_type_name)),
+							'#size' => 40,
+							'#maxlength' => 255,
+							'#default_value' => variable_get("pathauto_panelspagealias_{$task->taskname}_{$arg_name}_{$node_type_name}_token", ""),
+						);
+					}
+				}
+				
+			  // Display the user documentation of placeholders supported by
+		    // this module, as a description on the last pattern
+				// Use the token tree if available.
+				switch ($arg['argtype']) {
+					case 'nid':
+						$tokentype = 'node';
+						break;
+					case 'tid':
+						$tokentype = 'taxonomy';
+						break;
+					case 'uid':
+						$tokentype = 'user';
+						break;
+					default:
+						'all';
+				}
+
+		    $doc = theme('token_tree', array($tokentype));
+		    // if (empty($doc)) {
+		    //   $doc = "<dl>\n";
+		    //   foreach ($settings->placeholders as $name => $description) {
+		    //     $doc .= '<dt>'. $name .'</dt>';
+		    //     $doc .= '<dd>'. $description .'</dd>';
+		    //   }
+		    //   $doc .= "</dl>\n";
+		    // }
+		
+				if (!empty($doc)) {
+			    $pages_form["pathauto_panelspagealias_{$task->taskname}"]["pathauto_panelspagealias_{$task->taskname}_{$arg_name}_token_help"] = array(
+			      '#title' => t('Replacement patterns'),
+			      '#type' => 'fieldset',
+			      '#collapsible' => TRUE,
+			      '#collapsed' => TRUE,
+			      '#description' => t('Use -raw replacements for text to avoid problems with HTML entities.'),
+			    );
+
+			    $pages_form["pathauto_panelspagealias_{$task->taskname}"]["pathauto_panelspagealias_{$task->taskname}_{$arg_name}_token_help"]['help'] = array(
+			      '#type' => 'markup',
+			      '#value' => $doc,
+			    );
+				}
+			}
+
+		}
+		
+		$form['panelspagealias']['panels_page_to_alias'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Panels page available for aliasing'),
+      '#description' => t('Check the panels pages for which aliases should be bulk generated.'),
+      '#weight' => -1,
+    );
+    
+		$form['panelspagealias']['panels_page_to_alias'] += $pages_form;
+		
+  }
+
+	if($form_id == 'pathauto_bulk_update_form') {
+    // dsm($form);
+		/*
+			TODO implement the builk update
+		*/
+	}
+	
+}
+
+function panelsalias_panels_submit($form, &$form_state){
+	// dsm('panelsalias_panels_submit');
+	// dsm($form, 'form');
+	// dsm($form_state, 'form_state');
+	
+	// dsm($form_state[]['base_alias']);
+	
+	#	https://ratatosk.backpackit.com/pub/1836982-debugging-drupal
+	
+	
+}
+
+
+/**
+ * Implementation of hook_taxonomy().
+ */
+#replace with hook_node_api()
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function panelspagealias_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+	// dsm($op, 'panelspagealias_nodeapi : op');
+	switch ($op) {
+		case 'insert':
+		case 'update':
+		// dsm($node, 'panelspagealias_nodeapi : '.$op);
+			// dsm($node, 'panelspagealias_nodeapi : $node');
+		
+	    $aliasable = _get_panels_page_aliasable();
+	    foreach ($aliasable as $task) {
+				// dsm($task, 'task');
+	      if (in_array('nid', $task->argumentstypes) && variable_get("pathauto_panelspagealias_{$task->taskname}_active", 0) == 1)
+					panelspagealias_create_aliases_bynode($node, $task, $op);
+	    }
+			break;
+		case 'delete':
+
+			/*
+				TODO delete the alias
+			*/
+			#panelspagealias_delete_alias();
+			break;
+	} 
+}
+
+
+
+/**
+ * Implements hook_taxonomy().
+ */
+function panelspagealias_taxonomy($op, $type, $object = NULL) {
+	// dsm('panelspagealias_taxonomy');
+  switch ($type) {
+    case 'term':
+		$term = (object) $object;
+      switch ($op) {
+        case 'insert':
+        case 'update':
+					// dsm($term->tid);
+				 	$aliasable = _get_panels_page_aliasable();
+			    foreach ($aliasable as $task) {
+						// dsm($task, 'task');
+						/*
+							TODO let this work with multiple tid arguments
+						*/
+			      if (!in_array('nid', $task->argumentstypes) && in_array('tid', $task->argumentstypes) && count($task->arguments) == 1 && variable_get("pathauto_panelspagealias_{$task->taskname}_active", 0) == 1)
+							panelspagealias_create_aliases_byterm($term, $task, $op);
+			    }
+        	break;
+        case 'delete':
+    			# no need to hook delete 'cause taxonomy delete relations in both sides
+      		break;
+      }
+      break;
+  }
+}
+
+/**
+ * Given a node, generate its panels aliases.
+ */
+
+/**
+ * Apply patterns to create an alias.
+ *
+ * @param $module
+ *   The name of your module (e.g., 'node').
+ * @param $op
+ *   Operation being performed on the content being aliased
+ *   ('insert', 'update', 'return', or 'bulkupdate').
+ * @param $source
+ *   An internal Drupal path to be aliased.
+ * @param $data
+ *   An array of keyed objects to pass to token_replace(). For simple
+ *   replacement scenarios 'node', 'user', and others are common keys, with an
+ *   accompanying node or user object being the value.  Only one key/value pair
+ *   is supported, otherwise you may pass the results from
+ *   pathauto_get_placeholders() here.
+ * @param $entity_id
+ *   The entity ID (node ID, user ID, etc.).
+ * @param $type
+ *   For modules which provided pattern items in hook_pathauto(),
+ *   the relevant identifier for the specific item to be aliased
+ *   (e.g., $node->type).
+ * @param $language
+ *   A string specify the path's language.
+ * @return
+ *   The alias that was created.
+ *
+ * @see _pathauto_set_alias()
+ * @see pathauto_get_placeholders()
+ */
+
+function panelspagealias_create_aliases_bynode($node, $task, $op) {
+	module_load_include('inc', 'pathauto');
+					// dsm($node->taxonomy, '$node->taxonomy');
+	// dsm('panelspagealias_create_alias');
+	// 
+	// dsm($node, 'node');
+	// dsm($task, 'task');
+	// dsm($op, 'op');
+	
+	// $path = preg_replace('/\/(!|%)([^\/]*)/','/[${2}]', $task->path);
+	$path = _panelspagealias_alias_format_path($task->path);
+	$alias_pattern = explode('/', $path);
+	// dsm($alias_pattern, 'alias_pattern');
+	$alias_source = explode('/', $path);
+
+	$aliases = array();
+	$placeholders = array('tokens'=>array(), 'values'=>array());
+	
+	_panelspagealias_alias_set_base($alias_pattern, $task);
+	
+	foreach ($task->arguments as $arg_name => $arg) {
+		// dsm($arg, 'arg');
+		// dsm($arg_token, '$arg_token');
+		
+		$pattern_index = array_search('['.$arg_name.']', $alias_pattern);
+		$source_index = array_search('['.$arg_name.']', $alias_source);
+		
+		switch ($arg['argtype']) {
+			case 'nid':
+			# node
+			
+				$sub_pattern = variable_get("pathauto_panelspagealias_{$task->taskname}_{$arg_name}_{$node->type}_token", "");
+
+        if ($sub_pattern == "")
+					$sub_pattern = variable_get("pathauto_panelspagealias_{$task->taskname}_{$arg_name}_token", "");			
+
+				if ($sub_pattern == "")
+          $sub_pattern = '[title-raw]';
+        
+
+
+				$placeholders['tokens'][] = $alias_pattern[$pattern_index];
+				
+				$nodeplaceholders = pathauto_get_placeholders('node', $node);
+				// dsm($nodeplaceholders, '$nodeplaceholders');
+				$placeholders['values'][] = str_replace($nodeplaceholders['tokens'], $nodeplaceholders['values'], $sub_pattern);
+
+				$alias_source[$source_index] = $node->nid;
+				break;
+			case 'tid':
+			#taxonomy
+				$sub_pattern = variable_get("pathauto_panelspagealias_{$task->taskname}_{$arg_name}_token", "");			
+				if ($sub_pattern == "")
+          $sub_pattern = '[cat-raw]';
+				
+				// dsm($node->taxonomy, '$node->taxonomy');
+				$tids = array();
+				// foreach ($node->taxonomy as $vid => $terms) {
+				foreach ($node->taxonomy as $key => $value) {
+					# this if is because of nodeapi update is called twice for some content types, don't know why …
+					if(is_array($value)){
+						foreach ($value as $tid){
+							if($tid == '')
+								continue;
+							
+							if(in_array($key, $arg['vids']))
+								$tids[$tid] = $tid;
+								
+						}
+					}elseif(isset($value->tid) && isset($value->vid)){
+						if(in_array($value->vid, $arg['vids']))
+							$tids[$value->tid] = $value->tid;
+						
+					}
+				}
+				
+				$rtids = array();
+				foreach ($tids as $tid) {
+					# relateds
+					$relateds = taxonomy_get_related($tid);
+				
+					foreach ($relateds as $rtid => $related)
+						if(in_array($related->vid, $arg['vids']))
+							$rtids[$rtid] = $rtid;
+					
+				}
+				$tids += $rtids;
+				
+				// dsm($tids, '$tids');
+				
+				foreach ($tids as $tid) {
+					$termplaceholders = pathauto_get_placeholders('taxonomy', taxonomy_get_term($tid));
+					$value = str_replace($termplaceholders['tokens'], $termplaceholders['values'], $sub_pattern);
+					$alias_source[$source_index] = $tid;
+					$aliases[] = _panelspagealias_alias_object($placeholders, $alias_pattern[$pattern_index], $value, $alias_source, $alias_pattern);
+				}
+				
+				break;
+			default:
+				drupal_set_message($arg['argtype'], 'arg type not available : $arg["argtype"]');
+				break;
+		}
+		
+	}
+
+	// dsm($aliases, 'ALIASES');
+
+	_panelspagealias_save_aliases($aliases, $op, $task->pid, $node->language);
+
+	return;
+}
+
+function panelspagealias_create_aliases_byterm($term, $task, $op){
+	// dsm('panelspagealias_create_aliases_byterm');
+	// dsm($term, 'term');
+	// dsm($task, 'task');
+	
+	module_load_include('inc', 'pathauto');
+	
+	$path = _panelspagealias_alias_format_path($task->path);
+	$alias_pattern = explode('/', $path);
+	// dsm($alias_pattern, 'alias_pattern');
+	$alias_source = explode('/', $path);
+	
+
+	$placeholders = array('tokens'=>array(), 'values'=>array());
+	
+	_panelspagealias_alias_set_base($alias_pattern, $task);
+
+	# for now, just work with one argument
+	# foreach is for future multiple tid arguments logic
+	$aliases = array();
+	foreach ($task->arguments as $arg_name => $arg) {
+		
+		// dsm($task->arguments, '$task->arguments');
+		// $arg = $task->arguments[0];
+		// dsm($arg, 'arg');
+		// $arg_name = $arg['token'];
+		// dsm($arg_name, 'arg_name');
+
+		$pattern_index = array_search('['.$arg_name.']', $alias_pattern);
+		$source_index = array_search('['.$arg_name.']', $alias_source);
+		
+		$sub_pattern = variable_get("pathauto_panelspagealias_{$task->taskname}_{$arg_name}_token", "");			
+		if ($sub_pattern == "")
+      $sub_pattern = '[cat-raw]';
+
+		
+		$termplaceholders = pathauto_get_placeholders('taxonomy', taxonomy_get_term($term->tid));
+		$value = str_replace($termplaceholders['tokens'], $termplaceholders['values'], $sub_pattern);
+		$alias_source[$source_index] = $term->tid;
+		$aliases[] = _panelspagealias_alias_object($placeholders, $alias_pattern[$pattern_index], $value, $alias_source, $alias_pattern);
+		
+	}
+
+
+	// dsm($aliases, 'ALIASES');
+
+	_panelspagealias_save_aliases($aliases, $op, $task->pid, $node->language);
+
+	
+	return;
+}
+
+
+/**
+ * Delete an alias set by View Alias.
+ */
+function panelspagealias_delete_alias($node, $alias) {
+  $alias_path = panelspagealias_create_alias($node, $alias, 'update');
+  path_set_alias(NULL, $alias_path);
+}
+
+/**
+ * helper functions
+ * 
+ */
+/**
+ * find the pages that can be aliased.
+ * that means have a path url and use a term or node id as an argument
+ * build and array of objects, keyed with the view name, having the view path, and the vocab id for the terms used
+ * array(
+ *   0 => task
+ * )
+ */
+
+function _get_panels_page_aliasable() {
+	// dsm('_get_panels_page_aliasable');
+	
+  $aliasable_panelspage = array();
+	
+	module_load_include('inc', 'page_manager', 'page_manager.admin');
+	$tasks = page_manager_get_tasks_by_type('page');
+	// dsm($tasks);
+	
+  $pages = array('operations' => array(), 'tasks' => array());
+ 	page_manager_get_pages($tasks, $pages);
+	// dsm($pages, 'pages');
+	
+	foreach ($pages['rows'] as $id => $info) {
+    $task = page_manager_get_page_cache($id);
+		if($task->task['page type'] != 'custom')
+			continue;
+
+		// dsm($task, 'task');
+		
+		$arguments = $task->subtask['subtask']->arguments;
+		if(!count($arguments))
+			continue;
+		// dsm($arguments);
+		
+		$aliasargs = array();
+		$aliasargstypes = array();
+		foreach ($arguments as $key => $argument){
+			if($argument['name'] == 'nid'){
+				$aliasargs[$key] = array('argtype'=>'nid', 'token'=>$key, 'nodetypes'=>array());
+				$aliasargstypes[] = 'nid';
+			}elseif($argument['name'] == 'term' && $argument['settings']['input_form'] == 'tid'){
+				$vids = array();
+				foreach ($argument['settings']['vids'] as $vid => $value)
+					if($value)
+						$vids[]=$vid;
+				
+				if(count($vids)){
+					$aliasargs[$key] = array('argtype'=>'tid', 'token'=>$key, 'vids'=>$vids);
+					$aliasargstypes[] = 'tid';
+				}
+			}
+		}
+		
+		if($aliasargs){
+			$alias = new stdClass();
+			$alias->taskname = $task->task_name;
+			$alias->path = $task->subtask['subtask']->path;
+			$alias->subtaskname = $task->subtask['name'];
+			$alias->arguments = $aliasargs;
+			$alias->argumentstypes = $aliasargstypes;
+			$alias->pid = $task->subtask['subtask']->pid;
+			$alias->title = $task->subtask['subtask']->admin_title;
+
+			$aliasable_panelspage[$task->task_name] = $alias;
+			
+		}
+
+				
+	}
+	
+  return $aliasable_panelspage;
+}
+
+function _panelspagealias_get_node_pattern($node){
+
+   $pattern = trim(variable_get("pathauto_node_{$node->type}_{$node->language}_pattern", ''));
+   if (empty($pattern)) {
+     $pattern = trim(variable_get("pathauto_node_{$node->type}_pattern", ''));
+	  if (empty($pattern)) {
+	    $pattern = trim(variable_get("pathauto_node_pattern", ''));
+	  }
+   }
+
+  // No pattern? Do nothing (otherwise we may blow away existing aliases...)
+  if (empty($pattern))
+    return false;
+	
+	return $pattern;
+}
+
+function _panelspagealias_save_aliases($aliases, $op, $entity_id, $language){
+	foreach($aliases as $alias){
+		$GLOBALS['conf']['pathauto_panelspagealias_pattern'] = $alias->pattern;
+		$alias_path = pathauto_create_alias('panelspagealias', $op, $alias->placeholders, $alias->source, $entity_id, NULL, $language);
+	}
+}
+
+function _panelspagealias_alias_object($placeholders, $token, $value, $source, $pattern){
+
+	$alias = new stdClass();
+
+	$alias->placeholders = array(
+		'tokens'=> array_merge($placeholders['tokens'], (array)$token),
+		'values' => array_merge($placeholders['values'], (array)$value),
+	);
+
+	$alias->source = implode($source, '/');
+	$alias->pattern = implode($pattern, '/');
+	
+	return $alias;
+}
+
+function _panelspagealias_alias_format_path($path){
+	return preg_replace('/\/(!|%)([^\/]*)/','/[${2}]', $path);
+}
+
+function _panelspagealias_alias_set_base(&$alias_pattern, $task){
+	$base = trim(variable_get("pathauto_panelspagealias_{$task->taskname}_alias_base", ""));
+	
+	if($base != ''){
+		// dsm($base, 'base');
+
+		while (preg_match('/^\[.*\]$/', $alias_pattern[0]) == 0)
+			array_shift($alias_pattern);
+			
+		if($base != "<none>")
+			array_unshift($alias_pattern, $base);
+		
+	}
+}
